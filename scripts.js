@@ -57,6 +57,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // === Handle Login ===
 loginBtn.addEventListener('click', async (e) => {
     e.preventDefault();
+
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
 
@@ -66,33 +67,47 @@ loginBtn.addEventListener('click', async (e) => {
     }
 
     try {
-        loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
         loginBtn.disabled = true;
+        loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
         const response = await fetch(`${BASE_URL}/api/users/login/`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: username, password: password })
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: username,
+                password: password
+            })
         });
 
         const data = await response.json();
+        console.log('Login response:', response.status, data);
 
-        if (response.ok) {
-            accessToken = data.access;
-            refreshToken = data.refresh;
+        if (response.ok && data.tokens && data.tokens.access) {
+            accessToken = data.tokens.access;
+            refreshToken = data.tokens.refresh;
+
             localStorage.setItem('civiceye_access', accessToken);
             localStorage.setItem('civiceye_refresh', refreshToken);
+
             showReportingInterface();
         } else {
-            showMessage(loginResponse, data.detail || 'Login failed. Please check your credentials.', 'error');
+            showMessage(
+                loginResponse,
+                data.detail || data.message || 'Login failed — check credentials',
+                'error'
+            );
         }
     } catch (error) {
-        showMessage(loginResponse, 'Network error. Please try again.', 'error');
+        console.error('Login error:', error);
+        showMessage(loginResponse, 'An error occurred. Try again.', 'error');
     } finally {
-        loginBtn.innerHTML = 'Login';
         loginBtn.disabled = false;
+        loginBtn.innerHTML = 'Login';
     }
 });
+
 
 // === Handle Logout ===
 logoutBtn.addEventListener('click', () => {
