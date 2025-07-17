@@ -1,5 +1,5 @@
 // === CONFIGURATION ===
-const BASE_URL = 'http://127.0.0.1:8000';
+const BASE_URL = 'https://3f2d297d5513.ngrok-free.app';
 const DETECTION_API_URL = 'https://detect.roboflow.com/pothole-detection-lwf9u/3';
 const API_KEY = 'zwRLkWFX34uJ2UPRjUYC';
 const MAX_SESSION_MINUTES = 20;
@@ -55,6 +55,7 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // === Handle Login ===
+// === Handle Login (Enhanced with Debug) ===
 loginBtn.addEventListener('click', async (e) => {
     e.preventDefault();
 
@@ -82,20 +83,65 @@ loginBtn.addEventListener('click', async (e) => {
         });
 
         const data = await response.json();
-        console.log('Login response:', response.status, data);
+        
+        // ADD THIS DEBUG LOGGING
+        console.log('=== LOGIN DEBUG ===');
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+        console.log('Full response data:', data);
+        console.log('data.tokens:', data.tokens);
+        console.log('data.access:', data.access);
+        console.log('==================');
 
-        if (response.ok && data.tokens && data.tokens.access) {
-            accessToken = data.tokens.access;
-            refreshToken = data.tokens.refresh;
+        // Check different possible response structures
+        let accessToken = null;
+        let refreshToken = null;
 
-            localStorage.setItem('civiceye_access', accessToken);
-            localStorage.setItem('civiceye_refresh', refreshToken);
+        if (response.ok) {
+            // Try different possible response formats
+            if (data.tokens && data.tokens.access) {
+                // Format 1: { tokens: { access: "...", refresh: "..." } }
+                accessToken = data.tokens.access;
+                refreshToken = data.tokens.refresh;
+            } else if (data.access) {
+                // Format 2: { access: "...", refresh: "..." }
+                accessToken = data.access;
+                refreshToken = data.refresh;
+            } else if (data.access_token) {
+                // Format 3: { access_token: "...", refresh_token: "..." }
+                accessToken = data.access_token;
+                refreshToken = data.refresh_token;
+            } else if (data.token) {
+                // Format 4: { token: "..." }
+                accessToken = data.token;
+                refreshToken = data.refresh || null;
+            }
 
-            showReportingInterface();
+            if (accessToken) {
+                // Store tokens
+                localStorage.setItem('civiceye_access', accessToken);
+                if (refreshToken) {
+                    localStorage.setItem('civiceye_refresh', refreshToken);
+                }
+
+                // Update global variables
+                window.accessToken = accessToken;
+                window.refreshToken = refreshToken;
+
+                showReportingInterface();
+                showMessage(loginResponse, 'Login successful!', 'success');
+            } else {
+                console.error('No access token found in response:', data);
+                showMessage(
+                    loginResponse,
+                    'Login response missing token. Check console for details.',
+                    'error'
+                );
+            }
         } else {
             showMessage(
                 loginResponse,
-                data.detail || data.message || 'Login failed — check credentials',
+                data.detail || data.message || data.error || 'Login failed — check credentials',
                 'error'
             );
         }
