@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CivicEye - Report Infrastructure Issues</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-eye"></i>
+                <h1>CivicEye</h1>
+            </div>
+            <p class="tagline">Help improve your community infrastructure by reporting issues directly to local authorities</p>
+        </header>
+
+        <!-- Login Section -->
+        <section id="login-section" class="card">
+            <h2 class="card-title">Login to CivicEye</h2>
+            <div class="form-group">
+                <label for="username">Email</label>
+                <input type="text" id="username" placeholder="Enter your email">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Enter your password">
+            </div>
+            <button id="login-btn" class="btn btn-primary">Login</button>
+            <div id="login-response" class="response-message hidden"></div>
+        </section>
+
+        <!-- Reporting Section (Initially Hidden) -->
+        <section id="report-section" class="card hidden">
+            <h2 class="card-title">Report an Infrastructure Issue</h2>
+            
+            <!-- Mode Selector -->
+            <div class="mode-selector">
+                <button id="pedestrian-mode-btn" class="mode-btn active">
+                    <i class="fas fa-walking"></i> Pedestrian Mode
+                </button>
+                <button id="driver-mode-btn" class="mode-btn">
+                    <i class="fas fa-car"></i> Driver Mode
+                </button>
+            </div>
+            
+            <!-- GPS Status Indicator -->
+            <div id="gps-status" class="gps-status">
+                <i class="fas fa-satellite"></i>
+                <div>
+                    <h3>Location Status</h3>
+                    <p>Waiting for GPS coordinates...</p>
+                </div>
+            </div>
+            
+            <!-- Pedestrian Mode Form -->
+            <form id="pedestrian-form" class="reporting-form">
+                <div class="form-group">
+                    <label for="issue-type">Issue Type</label>
+                    <select id="issue-type">
+                        <option value="">Select an issue type</option>
+                        <option value="pothole">Pothole</option>
+                        <option value="drainage">Drainage Problem</option>
+                        <option value="signage">Signage Issue</option>
+                        <option value="lighting">Street Lighting</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" rows="4" placeholder="Please describe the issue in detail"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="image-upload">Upload Image</label>
+                    <input type="file" id="image-upload" accept="image/*" capture="environment" />
+                </div>
+                
+                <!-- Image Preview -->
+                <div class="image-preview">
+                    <img id="image-preview" src="#" alt="Image preview">
+                </div>
+                
+                <!-- Location Preview -->
+                <div class="location-preview">
+                    <div class="location-info">
+                        <h3>Latitude</h3>
+                        <p id="latitude-value">Not available</p>
+                    </div>
+                    <div class="location-info">
+                        <h3>Longitude</h3>
+                        <p id="longitude-value">Not available</p>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Submit Report</button>
+                <div id="pedestrian-response" class="response-message hidden"></div>
+            </form>
+            
+            <!-- Driver Mode Form -->
+            <div id="driver-form" class="reporting-form hidden">
+                <div class="video-container">
+                    <video id="live-video" autoplay playsinline muted></video>
+                    <canvas id="video-canvas"></canvas>
+                </div>
+                <div class="driver-controls">
+                    <button id="start-drive-btn" class="btn btn-primary">
+                        <i class="fas fa-play"></i> Start Drive Session
+                    </button>
+                    <button id="stop-drive-btn" class="btn btn-danger hidden">
+                        <i class="fas fa-stop"></i> Stop Drive Session
+                    </button>
+                    <div class="session-info">
+                        <p>Session Time: <span id="session-time">00:00</span></p>
+                        <p>API Calls: <span id="api-calls">0</span>/240</p>
+                        <p>Potholes Detected: <span id="pothole-count">0</span></p>
+                    </div>
+                </div>
+                <div id="driver-response" class="response-message hidden"></div>
+            </div>
+            
+            <button type="button" id="logout-btn" class="btn btn-logout">Logout</button>
+        </section>
+        
+        <footer>
+            <p>CivicEye - Empowering Communities Through Technology</p>
+            <p class="mt-20">Your reports help make our cities safer and better maintained</p>
+        </footer>
+    </div>
+    
+    <!-- Audio for pothole detection -->
+    <audio id="pothole-alert" src="https://assets.mixkit.co/sfx/preview/mixkit-alarm-digital-clock-beep-989.mp3" preload="auto"></audio>
+    
+    <script src="scripts.js"></script>
+</body>
+</html>
