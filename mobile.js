@@ -1,5 +1,5 @@
 // === CONFIGURATION ===
-const BASE_URL = 'https://361e22cb78db.ngrok-free.app';
+const BASE_URL = 'https://2268c056250a.ngrok-free.app';
 const DETECTION_API_URL = 'https://detect.roboflow.com/pothole-detection-lwf9u/3';
 const API_KEY = 'zwRLkWFX34uJ2UPRjUYC';
 const MAX_SESSION_MINUTES = 20;
