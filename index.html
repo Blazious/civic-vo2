@@ -6,6 +6,72 @@
     <title>CivicEye - Report Infrastructure Issues</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Additional styles for new elements */
+        .frame-data-container {
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        
+        .frame-data-item {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            background: white;
+        }
+        
+        #export-frame-data {
+            margin-top: 10px;
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .session-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .session-metrics div {
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        .session-metrics span:first-child {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        
+        #debug-console {
+            margin-top: 20px;
+            display: none;
+        }
+        
+        #debug-output {
+            width: 100%;
+            height: 100px;
+            font-family: monospace;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -55,6 +121,18 @@
                 </div>
             </div>
             
+            <!-- Location Preview -->
+            <div class="location-preview">
+                <div class="location-info">
+                    <h3>Latitude</h3>
+                    <p id="latitude-value">Not available</p>
+                </div>
+                <div class="location-info">
+                    <h3>Longitude</h3>
+                    <p id="longitude-value">Not available</p>
+                </div>
+            </div>
+            
             <!-- Pedestrian Mode Form -->
             <form id="pedestrian-form" class="reporting-form">
                 <div class="form-group">
@@ -84,18 +162,6 @@
                     <img id="image-preview" src="#" alt="Image preview">
                 </div>
                 
-                <!-- Location Preview -->
-                <div class="location-preview">
-                    <div class="location-info">
-                        <h3>Latitude</h3>
-                        <p id="latitude-value">Not available</p>
-                    </div>
-                    <div class="location-info">
-                        <h3>Longitude</h3>
-                        <p id="longitude-value">Not available</p>
-                    </div>
-                </div>
-                
                 <button type="submit" class="btn btn-primary">Submit Report</button>
                 <div id="pedestrian-response" class="response-message hidden"></div>
             </form>
@@ -106,6 +172,7 @@
                     <video id="live-video" autoplay playsinline muted></video>
                     <canvas id="video-canvas"></canvas>
                 </div>
+                
                 <div class="driver-controls">
                     <button id="start-drive-btn" class="btn btn-primary">
                         <i class="fas fa-play"></i> Start Drive Session
@@ -113,13 +180,39 @@
                     <button id="stop-drive-btn" class="btn btn-danger hidden">
                         <i class="fas fa-stop"></i> Stop Drive Session
                     </button>
-                    <div class="session-info">
-                        <p>Session Time: <span id="session-time">00:00</span></p>
-                        <p>API Calls: <span id="api-calls">0</span>/240</p>
-                        <p>Potholes Detected: <span id="pothole-count">0</span></p>
+                    
+                    <div class="session-metrics">
+                        <div>
+                            <span>Session Time</span>
+                            <span id="session-time">00:00</span>
+                        </div>
+                        <div>
+                            <span>API Calls</span>
+                            <span id="api-calls">0</span>/240
+                        </div>
+                        <div>
+                            <span>Potholes Detected</span>
+                            <span id="pothole-count">0</span>
+                        </div>
                     </div>
                 </div>
+                
+                <!-- Frame Data Display -->
+                <div id="frame-data-container" class="frame-data-container hidden">
+                    <h4>Session Frame Data</h4>
+                    <div id="frame-data-list"></div>
+                    <button id="export-frame-data" class="btn btn-secondary">
+                        <i class="fas fa-download"></i> Export Frame Data
+                    </button>
+                </div>
+                
                 <div id="driver-response" class="response-message hidden"></div>
+            </div>
+            
+            <!-- Debug Console (optional) -->
+            <div id="debug-console" class="hidden">
+                <h4>Debug Console</h4>
+                <textarea id="debug-output" readonly></textarea>
             </div>
             
             <button type="button" id="logout-btn" class="btn btn-logout">Logout</button>

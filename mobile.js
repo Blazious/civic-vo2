@@ -1,7 +1,6 @@
 // === CONFIGURATION ===
 const BASE_URL = 'https://2268c056250a.ngrok-free.app';
-const DETECTION_API_URL = 'https://detect.roboflow.com/pothole-detection-lwf9u/3';
-const API_KEY = 'zwRLkWFX34uJ2UPRjUYC';
+const DETECTION_API_URL = `${BASE_URL}/api/detection/detect/`;
 const MAX_SESSION_MINUTES = 20;
 const FRAME_CAPTURE_INTERVAL = 5000; // 5 seconds
 
@@ -43,6 +42,7 @@ let sessionSeconds = 0;
 let apiCalls = 0;
 let potholesDetected = 0;
 let isDriverMode = false;
+let frameCaptures = []; // Stores all frame data with locations
 
 // === Geolocation Manager ===
 const GeolocationManager = {
@@ -394,7 +394,72 @@ const GeolocationManager = {
     }
 };
 
-// === Load Tokens on Page Load ===
+// === Helper Functions ===
+async function getCurrentLocationWithFallback() {
+    try {
+        if (!currentLocation) {
+            await GeolocationManager.getLocationWithFallbacks();
+        }
+        return currentLocation || {
+            latitude: 0,
+            longitude: 0,
+            accuracy: 0,
+            isApproximate: true
+        };
+    } catch (error) {
+        console.error('Error getting location:', error);
+        return {
+            latitude: 0,
+            longitude: 0,
+            accuracy: 0,
+            isApproximate: true
+        };
+    }
+}
+
+function showMessage(element, message, type) {
+    element.textContent = message;
+    element.className = `response-message ${type}`;
+    element.classList.remove('hidden');
+    setTimeout(() => element.classList.add('hidden'), 5000);
+}
+
+function showReportingInterface() {
+    loginSection.classList.add('hidden');
+    reportSection.classList.remove('hidden');
+    GeolocationManager.init();
+}
+
+function updateSessionDisplay() {
+    const minutes = Math.floor(sessionSeconds / 60).toString().padStart(2, '0');
+    const seconds = (sessionSeconds % 60).toString().padStart(2, '0');
+    sessionTimeDisplay.textContent = `${minutes}:${seconds}`;
+    apiCallsDisplay.textContent = apiCalls;
+    potholeCountDisplay.textContent = potholesDetected;
+}
+
+function drawBoundingBoxes(predictions) {
+    const ctx = videoCanvas.getContext('2d');
+    ctx.clearRect(0, 0, videoCanvas.width, videoCanvas.height);
+    
+    predictions.forEach(prediction => {
+        const { x, y, width, height } = prediction;
+        
+        ctx.strokeStyle = '#FF0000';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x - width/2, y - height/2, width, height);
+        
+        ctx.fillStyle = '#FF0000';
+        const textWidth = ctx.measureText('Pothole').width;
+        ctx.fillRect(x - width/2, y - height/2 - 20, textWidth + 10, 20);
+        
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '16px Arial';
+        ctx.fillText('Pothole', x - width/2 + 5, y - height/2 - 5);
+    });
+}
+
+// === Event Listeners ===
 window.addEventListener('DOMContentLoaded', () => {
     const storedToken = localStorage.getItem('civiceye_access');
     if (storedToken) {
@@ -404,7 +469,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// === Handle Login ===
 loginBtn.addEventListener('click', async (e) => {
     e.preventDefault();
 
@@ -433,14 +497,6 @@ loginBtn.addEventListener('click', async (e) => {
 
         const data = await response.json();
         
-        console.log('=== LOGIN DEBUG ===');
-        console.log('Response status:', response.status);
-        console.log('Response ok:', response.ok);
-        console.log('Full response data:', data);
-        console.log('data.tokens:', data.tokens);
-        console.log('data.access:', data.access);
-        console.log('==================');
-
         let accessToken = null;
         let refreshToken = null;
 
@@ -494,7 +550,6 @@ loginBtn.addEventListener('click', async (e) => {
     }
 });
 
-// === Handle Logout ===
 logoutBtn.addEventListener('click', () => {
     stopDriveSession();
     GeolocationManager.stopWatchingPosition();
@@ -505,6 +560,7 @@ logoutBtn.addEventListener('click', () => {
     refreshToken = null;
     currentLocation = null;
     roadName = null;
+    frameCaptures = [];
 
     loginSection.classList.remove('hidden');
     reportSection.classList.add('hidden');
@@ -521,7 +577,6 @@ logoutBtn.addEventListener('click', () => {
     `;
 });
 
-// === Image Preview on Upload ===
 imageUpload.addEventListener('change', function () {
     if (this.files && this.files[0]) {
         const reader = new FileReader();
@@ -533,7 +588,6 @@ imageUpload.addEventListener('change', function () {
     }
 });
 
-// === Pedestrian Mode Form Submission ===
 pedestrianForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const issueType = document.getElementById('issue-type').value;
@@ -586,7 +640,6 @@ pedestrianForm.addEventListener('submit', async (e) => {
     }
 });
 
-// === Mode Switching ===
 pedestrianModeBtn.addEventListener('click', () => {
     if (isDriverMode) {
         stopDriveSession();
@@ -616,7 +669,6 @@ function switchMode(driverMode) {
     }
 }
 
-// === Video Stream Handling ===
 async function initVideoStream() {
     try {
         videoStream = await navigator.mediaDevices.getUserMedia({
@@ -634,7 +686,6 @@ async function initVideoStream() {
     }
 }
 
-// === Drive Session Controls ===
 startDriveBtn.addEventListener('click', startDriveSession);
 stopDriveBtn.addEventListener('click', stopDriveSession);
 
@@ -652,6 +703,7 @@ function startDriveSession() {
     sessionSeconds = 0;
     apiCalls = 0;
     potholesDetected = 0;
+    frameCaptures = [];
     updateSessionDisplay();
 
     startDriveBtn.classList.add('hidden');
@@ -677,6 +729,12 @@ function stopDriveSession() {
     startDriveBtn.classList.remove('hidden');
     stopDriveBtn.classList.add('hidden');
     
+    // Log all frame captures with locations
+    console.log('Session frame captures with GPS data:', frameCaptures);
+    
+    // Optionally save to localStorage
+    localStorage.setItem('last_session_frames', JSON.stringify(frameCaptures));
+    
     if (videoStream) {
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
@@ -692,12 +750,31 @@ async function captureAndDetect() {
     }
 
     try {
+        // Get current location before capturing frame
+        const frameLocation = await getCurrentLocationWithFallback();
+        
         const canvas = document.createElement('canvas');
         canvas.width = liveVideo.videoWidth;
         canvas.height = liveVideo.videoHeight;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(liveVideo, 0, 0, canvas.width, canvas.height);
         const imageData = canvas.toDataURL('image/jpeg');
+        
+        // Store frame data with location
+        const frameData = {
+            timestamp: new Date().toISOString(),
+            imageData: imageData,
+            location: {
+                latitude: frameLocation.latitude,
+                longitude: frameLocation.longitude,
+                accuracy: frameLocation.accuracy,
+                isApproximate: frameLocation.isApproximate || false
+            },
+            roadName: roadName || null
+        };
+        
+        frameCaptures.push(frameData);
+        console.log('Frame captured with location:', frameData.location);
 
         const response = await fetch(DETECTION_API_URL, {
             method: 'POST',
@@ -706,7 +783,9 @@ async function captureAndDetect() {
             },
             body: new URLSearchParams({
                 api_key: API_KEY,
-                image: imageData.split(',')[1]
+                image: imageData.split(',')[1],
+                latitude: frameLocation.latitude,
+                longitude: frameLocation.longitude
             })
         });
 
@@ -719,11 +798,14 @@ async function captureAndDetect() {
                 potholesDetected += potholePredictions.length;
                 drawBoundingBoxes(potholePredictions);
                 potholeAlert.play();
+                
+                // Add predictions to frame data
+                frameData.predictions = potholePredictions;
             }
         }
         
         if (data.predictions && data.predictions.some(p => p.class === 'pothole')) {
-            await saveDriveReport(imageData, data);
+            await saveDriveReport(frameData);
         }
         
         updateSessionDisplay();
@@ -732,41 +814,24 @@ async function captureAndDetect() {
     }
 }
 
-function drawBoundingBoxes(predictions) {
-    const ctx = videoCanvas.getContext('2d');
-    ctx.clearRect(0, 0, videoCanvas.width, videoCanvas.height);
-    
-    predictions.forEach(prediction => {
-        const { x, y, width, height } = prediction;
-        
-        ctx.strokeStyle = '#FF0000';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(x - width/2, y - height/2, width, height);
-        
-        ctx.fillStyle = '#FF0000';
-        const textWidth = ctx.measureText('Pothole').width;
-        ctx.fillRect(x - width/2, y - height/2 - 20, textWidth + 10, 20);
-        
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = '16px Arial';
-        ctx.fillText('Pothole', x - width/2 + 5, y - height/2 - 5);
-    });
-}
-
-async function saveDriveReport(imageData, predictionData) {
+async function saveDriveReport(frameData) {
     try {
-        const blob = await (await fetch(imageData)).blob();
+        const blob = await (await fetch(frameData.imageData)).blob();
         const file = new File([blob], 'pothole-detection.jpg', { type: 'image/jpeg' });
 
         const formData = new FormData();
-        formData.append('latitude', currentLocation.latitude);
-        formData.append('longitude', currentLocation.longitude);
+        formData.append('latitude', frameData.location.latitude);
+        formData.append('longitude', frameData.location.longitude);
         formData.append('issue_type', 'pothole');
         formData.append('description', 'Automatically detected during drive session');
         formData.append('image', file);
-        formData.append('prediction_data', JSON.stringify(predictionData));
+        formData.append('prediction_data', JSON.stringify({
+            predictions: frameData.predictions,
+            location: frameData.location,
+            timestamp: frameData.timestamp
+        }));
 
-        if (roadName) formData.append('road_name', roadName);
+        if (frameData.roadName) formData.append('road_name', frameData.roadName);
 
         await fetch(`${BASE_URL}/api/reports/`, {
             method: 'POST',
@@ -780,85 +845,9 @@ async function saveDriveReport(imageData, predictionData) {
     }
 }
 
-function updateSessionDisplay() {
-    const minutes = Math.floor(sessionSeconds / 60).toString().padStart(2, '0');
-    const seconds = (sessionSeconds % 60).toString().padStart(2, '0');
-    sessionTimeDisplay.textContent = `${minutes}:${seconds}`;
-    apiCallsDisplay.textContent = apiCalls;
-    potholeCountDisplay.textContent = potholesDetected;
-}
-
-// === Show Reporting UI ===
-function showReportingInterface() {
-    loginSection.classList.add('hidden');
-    reportSection.classList.remove('hidden');
+// === Initialize ===
+if (document.readyState !== 'loading') {
     GeolocationManager.init();
+} else {
+    document.addEventListener('DOMContentLoaded', () => GeolocationManager.init());
 }
-
-// === Show Temporary Messages ===
-function showMessage(element, message, type) {
-    element.textContent = message;
-    element.className = `response-message ${type}`;
-    element.classList.remove('hidden');
-    setTimeout(() => element.classList.add('hidden'), 5000);
-}
-
-// Add this CSS to your stylesheet:
-/*
-.permission-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.7);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
-
-.permission-content {
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
-    max-width: 400px;
-}
-
-.permission-buttons {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-.permission-buttons button {
-    flex: 1;
-    padding: 10px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-#grant-permission-btn {
-    background: #4CAF50;
-    color: white;
-}
-
-#continue-anyway-btn {
-    background: #f0f0f0;
-}
-
-.retry-btn {
-    margin-top: 10px;
-    padding: 5px 10px;
-    background: #2196F3;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.retry-btn.hidden {
-    display: none;
-}
-*/
