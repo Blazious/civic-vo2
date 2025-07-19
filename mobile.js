@@ -1,5 +1,5 @@
 // === CONFIGURATION ===
-const BASE_URL = 'https://55602a953d2c.ngrok-free.app';
+const BASE_URL = 'https://c1d1776d61be.ngrok-free.app';
 const DETECTION_API_URL = `${BASE_URL}/api/detection/detect/`;
 const MAX_SESSION_MINUTES = 20;
 const FRAME_CAPTURE_INTERVAL = 5000; // 5 seconds
