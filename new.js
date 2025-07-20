@@ -1,5 +1,5 @@
 // === CONFIGURATION ===
-const BASE_URL = 'http://127.0.0.1:8000';
+const BASE_URL = 'https://6f6f3ee9ea25.ngrok-free.app';
 const DETECTION_API_URL = `${BASE_URL}/api/detection/detect/`;
 const MAX_SESSION_MINUTES = 20;
 const FRAME_CAPTURE_INTERVAL = 5000; // 5 seconds
@@ -187,7 +187,7 @@ const GeolocationManager = {
     },
 
     queryIPInfoIo: function() {
-        return fetch('https://ipinfo.io/json?token=YOUR_API_KEY')
+        return fetch('https://ipinfo.io/json')
             .then(response => response.json())
             .then(data => {
                 const [lat, lon] = data.loc.split(',');
@@ -482,7 +482,7 @@ loginBtn.addEventListener('click', async (e) => {
 
     try {
         loginBtn.disabled = true;
-        loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
 
         const response = await fetch(`${BASE_URL}/api/users/login/`, {
             method: 'POST',
@@ -497,53 +497,28 @@ loginBtn.addEventListener('click', async (e) => {
 
         const data = await response.json();
         
-        let accessToken = null;
-        let refreshToken = null;
-
-        if (response.ok) {
-            if (data.tokens && data.tokens.access) {
-                accessToken = data.tokens.access;
-                refreshToken = data.tokens.refresh;
-            } else if (data.access) {
-                accessToken = data.access;
-                refreshToken = data.refresh;
-            } else if (data.access_token) {
-                accessToken = data.access_token;
-                refreshToken = data.refresh_token;
-            } else if (data.token) {
-                accessToken = data.token;
-                refreshToken = data.refresh || null;
-            }
-
-            if (accessToken) {
-                localStorage.setItem('civiceye_access', accessToken);
-                if (refreshToken) {
-                    localStorage.setItem('civiceye_refresh', refreshToken);
-                }
-
-                window.accessToken = accessToken;
-                window.refreshToken = refreshToken;
-
-                showReportingInterface();
-                showMessage(loginResponse, 'Login successful!', 'success');
-            } else {
-                console.error('No access token found in response:', data);
-                showMessage(
-                    loginResponse,
-                    'Login response missing token. Check console for details.',
-                    'error'
-                );
-            }
-        } else {
-            showMessage(
-                loginResponse,
-                data.detail || data.message || data.error || 'Login failed — check credentials',
-                'error'
-            );
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Login failed');
         }
+
+        // Handle JWT tokens (access and refresh)
+        if (!data.access || !data.refresh) {
+            throw new Error('Invalid token response from server');
+        }
+
+        accessToken = data.access;
+        refreshToken = data.refresh;
+
+        // Store tokens in localStorage
+        localStorage.setItem('civiceye_access', accessToken);
+        localStorage.setItem('civiceye_refresh', refreshToken);
+
+        showReportingInterface();
+        showMessage(loginResponse, 'Login successful!', 'success');
+
     } catch (error) {
         console.error('Login error:', error);
-        showMessage(loginResponse, 'An error occurred. Try again.', 'error');
+        showMessage(loginResponse, error.message || 'An error occurred during login', 'error');
     } finally {
         loginBtn.disabled = false;
         loginBtn.innerHTML = 'Login';
@@ -776,13 +751,14 @@ async function captureAndDetect() {
         frameCaptures.push(frameData);
         console.log('Frame captured with location:', frameData.location);
 
+        // Send to your custom detection model
         const response = await fetch(DETECTION_API_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
             },
-            body: new URLSearchParams({
-                api_key: API_KEY,
+            body: JSON.stringify({
                 image: imageData.split(',')[1],
                 latitude: frameLocation.latitude,
                 longitude: frameLocation.longitude
